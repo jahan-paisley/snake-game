@@ -10,11 +10,11 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>2.5.1</version>
+                <version>3.5.1</version>
                 <configuration>
                     <optimize>true</optimize>
-                    <source>1.7</source>
-                    <target>1.7</target>
+                    <source>1.8</source>
+                    <target>1.8</target>
                 </configuration>
             </plugin>
             <plugin>
@@ -96,7 +96,7 @@
                 </plugins>
             </build>
             <properties>
-                <mainClass>com.theweirdscience.demo.GameServer</mainClass>
+                <mainClass>com.theweirdscience.demo.PongServer</mainClass>
                 <port>9999</port>
             </properties>
         </profile>
@@ -121,7 +121,7 @@
                 </plugins>
             </build>
             <properties>
-                <mainClass>com.theweirdscience.demo.SecureGameServer</mainClass>
+                <mainClass>com.theweirdscience.demo.SecurePongServer</mainClass>
                 <port>9999</port>
             </properties>
         </profile>

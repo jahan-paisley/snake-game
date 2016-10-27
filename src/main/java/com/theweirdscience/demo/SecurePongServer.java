@@ -12,11 +12,11 @@ import java.net.InetSocketAddress;
 /**
  * @author <a href="mailto:norman.maurer@googlemail.com">Norman Maurer</a>
  */
-public class SecureGameServer extends GameServer {
+public class SecurePongServer extends PongServer {
 
     private final SslContext context;
 
-    public SecureGameServer(SslContext context) {
+    public SecurePongServer(SslContext context) {
         this.context = context;
     }
 
@@ -33,7 +33,7 @@ public class SecureGameServer extends GameServer {
         int port = Integer.parseInt(args[0]);
         SelfSignedCertificate cert = new SelfSignedCertificate();
         SslContext context = SslContext.newServerContext(cert.certificate(), cert.privateKey());
-        final SecureGameServer endpoint = new SecureGameServer(context);
+        final SecurePongServer endpoint = new SecurePongServer(context);
         ChannelFuture future = endpoint.start(new InetSocketAddress(port));
 
         Runtime.getRuntime().addShutdownHook(new Thread() {

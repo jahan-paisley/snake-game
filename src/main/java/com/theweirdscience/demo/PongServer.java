@@ -13,7 +13,7 @@ import io.netty.util.concurrent.ImmediateEventExecutor;
 
 import java.net.InetSocketAddress;
 
-public class GameServer {
+public class PongServer {
 
     private final ChannelGroup channelGroup = new DefaultChannelGroup(ImmediateEventExecutor.INSTANCE);
     private final EventLoopGroup group = new NioEventLoopGroup();
@@ -43,13 +43,13 @@ public class GameServer {
     }
 
     public static void main(String[] args) throws Exception{
-        if (args.length != 1) {
+        /*if (args.length != 1) {
             System.err.println("Please give port as argument");
             System.exit(1);
-        }
-        int port = Integer.parseInt(args[0]);
+        }*/
+        int port = Integer.parseInt(args.length > 0 ? args[0]: "8080");
 
-        final GameServer endpoint = new GameServer();
+        final PongServer endpoint = new PongServer();
         ChannelFuture future = endpoint.start(new InetSocketAddress(port));
 
         Runtime.getRuntime().addShutdownHook(new Thread() {
