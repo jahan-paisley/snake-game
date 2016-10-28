@@ -21,6 +21,7 @@
         }
     </style>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/lodash/4.16.4/lodash.min.js"></script>
 </head>
 <body>
 <div id="not-supported" style="float: left; width: 600px; margin-left: 10px; display: none">
@@ -46,7 +47,7 @@
 <canvas id="canvas" tabindex="1"></canvas>
 </body>
 <script type="text/javascript">
-    UNIT = 1;
+
     // RequestAnimFrame: a browser API for getting smooth animations
     window.requestAnimFrame = (function () {
         return window.requestAnimationFrame ||
@@ -58,7 +59,6 @@
                     return window.setTimeout(callback, 1000 / 60);
                 };
     })();
-
     window.cancelRequestAnimFrame = (function () {
         return window.cancelAnimationFrame ||
                 window.webkitCancelRequestAnimationFrame ||
@@ -67,29 +67,14 @@
                 window.msCancelRequestAnimationFrame ||
                 clearTimeout
     })();
+    // Initialize canvasElm and required variables
+    var canvasElm = document.getElementById("canvas"),
+            canvas = canvasElm.getContext("2d");
+    canvasElm.width = window.innerWidth;
+    canvasElm.height = window.innerHeight / 2;
 
-    // Initialize canvas and required variables
-    var canvas = document.getElementById("canvas"),
-            ctx = canvas.getContext("2d"), // Create canvas context
-            W = window.innerWidth / 2, // Window's width
-            H = window.innerHeight / 2; // Window's height
 
-    var snake = new Snake();
-
-    document.addEventListener('keydown', function (event) {
-        var keymap = {
-            '37': 'l',
-            '38': 'u',
-            '39': 'r',
-            '40': 'd'
-        }
-        snake.turn(keymap[event.keyCode.toString()]);
-    }, false);
-
-    canvas.addEventListener("mousedown", btnClick, true);
-
-    canvas.width = W;
-    canvas.height = H;
+    var game = new Game(canvas);
 
     function Point(x, y) {
         this.x = x;
@@ -99,16 +84,16 @@
             var nextp = new Point(this.x, this.y);
             switch (direction) {
                 case 'r':
-                    nextp.x += UNIT;
+                    nextp.x += 1;
                     break;
                 case 'l':
-                    nextp.x -= UNIT;
+                    nextp.x -= 1;
                     break;
                 case 'u':
-                    nextp.y -= UNIT
+                    nextp.y -= 1;
                     break;
                 case 'd':
-                    nextp.y += UNIT
+                    nextp.y += 1;
                     break;
             }
             return nextp;
@@ -127,13 +112,12 @@
         }
     }
 
-    // Function for creating opponents
     function Snake() {
         this.dots = [];
-        for (var i = 0; i < 100; i++) {
+        for (var i = 0; i < 50; i++) {
             this.dots.push(new Point(0, i));
         }
-        this.direction = 'r';
+        this.direction = 'd';
 
         this.turn = function (dir) {
             if (['r', 'l', 'u', 'd'].indexOf(dir) == -1)
@@ -153,14 +137,18 @@
         }
 
         this.move = function (canvas) {
-            var lastp = this.dots[snake.dots.length - 1];
+            var lastp = this.dots[this.dots.length - 1];
             var nextp = lastp.next(this.direction);
+            var fruitInx = _.findIndex(game.fruits, {x: lastp.x, y: lastp.y});
             this.dots.push(nextp);
-            this.dots = this.dots.slice(1);
+            if (fruitInx != -1)
+                game.fruits.splice(fruitInx, 1);
+            else
+                this.dots = this.dots.slice(1);
         }
 
         this.draw = function (canvas) {
-            canvas.lineWidth = 3;
+//            canvasElm.lineWidth = 1;
             canvas.strokeStyle = "red";
             canvas.beginPath();
             canvas.moveTo(this.dots[0].x, this.dots[0].y);
@@ -170,25 +158,49 @@
         }
     }
 
-    // Draw everything on canvas
-    function draw() {
-        ctx.fillRect(0, 0, W, H);
-        snake.draw(ctx);
-        snake.move(ctx);
+    function Game(canvas) {
+        this.snake = new Snake();
+        this.canvas = canvas;
+        this.fruits = [];
+
+        this.draw = function () {
+            this.canvas.fillRect(0, 0, window.innerWidth, window.innerHeight / 2);
+            this.snake.draw(canvas);
+            this.snake.move(canvas);
+            this.fillFruits()
+        }
+
+        this.fillFruits = function () {
+            for (var i = 0; i < this.fruits.length; i++) {
+                this.canvas.beginPath();
+                this.canvas.fillStyle = "yellow";
+                this.canvas.fillRect(this.fruits[i].x, this.fruits[i].y, 1, 1);
+                this.canvas.fillStyle = "black";
+            }
+        }
+
+        this.drawFruits = function () {
+            for (var i = 0; i < 50; i++) {
+                var x = Math.floor((Math.random() * window.innerWidth) + 1);
+                var y = Math.floor((Math.random() * window.innerHeight / 2) + 1);
+                this.fruits.push(new Point(x, y));
+            }
+        }
+
+        this.drawFruits();
+    }
+    game.animLoop = function () {
+        requestAnimFrame(game.animLoop);
+        game.draw();
     }
 
-    // Function for running the whole animation
-    function animloop() {
-        requestAnimFrame(animloop);
-        draw();
-    }
+    game.draw();
 
-    function btnClick(e) {
-        animloop();
-    }
-
-    // Show the start screen
-    draw();
+    document.addEventListener('keydown', function (event) {
+        var keymap = {'37': 'l', '38': 'u', '39': 'r', '40': 'd'};
+        game.snake.turn(keymap[event.keyCode.toString()]);
+    }, false);
+    canvasElm.addEventListener("mousedown", game.animLoop, true);
 
     function log(msg) {
         var log = $('#log');

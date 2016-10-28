@@ -28,6 +28,5 @@ public class GameServerInitializer extends ChannelInitializer<Channel> {
         pipeline.addLast(new HttpRequestHandler("/ws"));
         pipeline.addLast(new WebSocketServerProtocolHandler("/ws"));
         pipeline.addLast(new TextWebSocketFrameHandler(group));
-//        pipeline.addLast(new TextWebSocketFrameHandler(group));
     }
 }
