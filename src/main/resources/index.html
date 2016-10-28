@@ -15,59 +15,15 @@
         #ui textarea {
             height: 15em;
         }
+
+        body {
+            padding: 0;
+            margin: 0;
+            overflow: hidden;
+        }
     </style>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"></script>
-    <script type="text/javascript">
-        function log(msg) {
-            var log = $('#log');
-            log.append(msg + " \n").scrollTop(log[0].scrollHeight - log.height());
-        }
-        $(function () {
-            $('#url').val((location.protocol.indexOf('https') == -1 ? 'ws://' : 'wss://') + location.host + '/ws');
 
-            if (!WebSocket) {
-                $('#not-supported').show();
-            } else {
-                var ws = null;
-                $('#connect').click(function () {
-                    if (ws == null || ws.readyState != 1) {
-                        ws = new WebSocket($('#url').val());
-
-                        ws.onerror = function (e) {
-                            log('Error : ' + e.message);
-                        }
-
-                        ws.onopen = function () {
-                            log('connected');
-                        }
-
-                        ws.onclose = function () {
-                            log('disconnected');
-                        }
-
-                        ws.onmessage = function (d) {
-                            log('Response : ' + d.data);
-                        }
-
-                        $('#send').click(function () {
-                            var msg = $('#msg').val();
-                            $('#msg').val('');
-                           try {
-                               ws.send(msg);
-                               log('Message sent');
-                           }
-                           catch (ex) {
-                               log('Message not sent due to' + ex);
-                           }
-                        })
-                    } else {
-                        log('closing connection');
-                        ws.close();
-                    }
-                })
-            }
-        })
-    </script>
 </head>
 
 <body>
@@ -95,22 +51,193 @@
         </td>
     </tr>
 </table>
-<div style="float: left; width: 600px; margin-left: 10px;">
-    <p><br><strong>Instructions:</strong></p>
-    <table class="instructions" cellspacing="0px" cellpadding="2px">
-        <tr>
-            <td valign="top" nowrap>Step 1: &nbsp;</td>
-            <td valign="top">Press the <strong>Connect</strong> button.</td>
-        </tr>
-        <tr>
-            <td valign="top" nowrap>Step 2: &nbsp;</td>
-            <td valign="top">Once connected, enter a message and press the <strong>Send</strong> button. The server's
-                response will
-                appear in the <strong>Log</strong> section. You can send as many messages as you like
-            </td>
-        </tr>
-    </table>
-</div>
+<canvas id="canvas" tabindex="1"></canvas>
 </body>
+<script type="text/javascript">
+    UNIT = 10;
+    window.requestAnimFrame = (function () {
+        return function (callback) {
+            return window.setTimeout(callback, 1000 / 20);
+        };
+    })();
 
+    window.cancelRequestAnimFrame = (function () {
+        return clearTimeout;
+    })();
+
+
+    // Initialize canvas and required variables
+    var canvas = document.getElementById("canvas"),
+            ctx = canvas.getContext("2d"), // Create canvas context
+            W = window.innerWidth / 2, // Window's width
+            H = window.innerHeight / 2; // Window's height
+
+    var snake = new Snake();
+
+    document.addEventListener('keydown', function (event) {
+        var keymap = {
+            '37': 'l',
+            '38': 'u',
+            '39': 'r',
+            '40': 'd'
+        }
+        snake.turn(keymap[event.keyCode.toString()] || snake.direction);
+    }, false);
+
+    canvas.addEventListener("mousedown", btnClick, true);
+
+    canvas.width = W;
+    canvas.height = H;
+
+    function Point(x, y) {
+        this.x = x;
+        this.y = y;
+
+        this.next = function (direction) {
+            var nextp = new Point(this.x, this.y);
+            switch (direction) {
+                case 'r':
+                    nextp.x += UNIT;
+                    break;
+                case 'l':
+                    nextp.x -= UNIT;
+                    break;
+                case 'u':
+                    nextp.y -= UNIT
+                    break;
+                case 'd':
+                    nextp.y += UNIT
+                    break;
+            }
+            return nextp;
+        }
+
+        this.equals = function (b) {
+            try {
+                if (this.x === b.x && this.y === b.y) {
+                    return true;
+                }
+                return false;
+            }
+            catch (e) {
+                return false;
+            }
+        }
+    }
+
+    // Function for creating opponents
+    function Snake() {
+        this.dots = [new Point(UNIT, 10), new Point(UNIT, 20), new Point(UNIT, 30)];
+        this.direction = 'r';
+
+        this.turn = function (dir) {
+            if (this.validMove(dir))
+                this.direction = dir;
+            else
+                return;
+        }
+
+        this.validMove = function (dir) {
+            var last2p = this.dots[this.dots.length - 2];
+            var lastp = this.dots[this.dots.length - 1];
+            if (lastp.next(dir).equals(last2p))
+                return false;
+            return true;
+        }
+
+        this.move = function (canvas) {
+            var lastp = this.dots[snake.dots.length - 1];
+            var nextp = lastp.next(this.direction);
+            this.dots.push(nextp);
+            this.dots = this.dots.slice(1);
+        }
+
+        this.draw = function (canvas) {
+            canvas.strokeStyle = "red";
+            canvas.beginPath();
+            canvas.lineWidth = 4;
+            canvas.moveTo(this.dots[0].x, this.dots[0].y);
+            for (var i = 0; i < this.dots.length; ++i)
+                canvas.lineTo(this.dots[i].x, this.dots[i].y);
+            canvas.stroke();
+        }
+    }
+
+    // Draw everything on canvas
+    function draw() {
+        ctx.fillRect(0, 0, W, H);
+        snake.draw(ctx);
+        update();
+    }
+
+    // Basically, the main game logic is defined here
+    function update() {
+        snake.move(ctx);
+    }
+
+    // Function for running the whole animation
+    function animloop() {
+        requestAnimFrame(animloop);
+        draw();
+    }
+
+    // Function to execute at startup
+    function startScreen() {
+        draw();
+    }
+
+    // On button click (Restart and start)
+    function btnClick(e) {
+        animloop();
+    }
+
+    // Show the start screen
+    startScreen();
+
+    function log(msg) {
+        var log = $('#log');
+        log.append(msg + " \n").scrollTop(log[0].scrollHeight - log.height());
+    }
+
+    $(function () {
+        $('#url').val((location.protocol.indexOf('https') == -1 ? 'ws://' : 'wss://') + location.host + '/ws');
+
+        if (!WebSocket) {
+            $('#not-supported').show();
+        } else {
+            var ws = null;
+            $('#connect').click(function () {
+                if (ws == null || ws.readyState != 1) {
+                    ws = new WebSocket($('#url').val());
+                    ws.onerror = function (e) {
+                        log('Error : ' + e.message);
+                    }
+                    ws.onopen = function () {
+                        log('connected');
+                    }
+                    ws.onclose = function () {
+                        log('disconnected');
+                    }
+                    ws.onmessage = function (d) {
+                        log('Response : ' + d.data);
+                    }
+                    $('#send').click(function () {
+                        var msg = $('#msg').val();
+                        $('#msg').val('');
+                        try {
+                            ws.send(msg);
+                            log('Message sent');
+                        }
+                        catch (ex) {
+                            log('Message not sent due to' + ex);
+                        }
+                    })
+                } else {
+                    log('closing connection');
+                    ws.close();
+                }
+            });
+        }
+    });
+</script>
 </html>
