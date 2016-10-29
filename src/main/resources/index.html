@@ -88,7 +88,6 @@
     canvasElm.width = window.innerWidth;
     canvasElm.height = window.innerHeight / 2;
 
-
     var game = new Game(canvas);
 
     function Point(x, y) {
@@ -139,9 +138,7 @@
                 return;
             if (this.validMove(dir))
                 this.direction = dir;
-            else
-                return;
-        }
+        };
 
         this.validMove = function (dir) {
             var last2p = this.dots[this.dots.length - 2];
@@ -149,7 +146,7 @@
             if (lastp.next(dir).equals(last2p))
                 return false;
             return true;
-        }
+        };
 
         this.move = function (canvas) {
             var lastp = this.dots[this.dots.length - 1];
@@ -160,7 +157,7 @@
                 game.fruits.splice(fruitInx, 1);
             else
                 this.dots = this.dots.slice(1);
-        }
+        };
 
         this.draw = function (canvas) {
             canvasElm.lineWidth = 2;
@@ -183,7 +180,7 @@
             this.snake.draw(this.canvas);
             this.snake.move(this.canvas);
             this.fillFruits();
-        }
+        };
 
         this.fillFruits = function () {
             for (var i = 0; i < this.fruits.length; i++) {
@@ -200,14 +197,14 @@
                 var y = Math.floor((Math.random() * window.innerHeight / 2) + 1);
                 this.fruits.push(new Point(x, y));
             }
-        }
+        };
 
         this.drawFruits();
     }
     game.animLoop = function () {
         requestAnimFrame(game.animLoop);
         game.draw();
-    }
+    };
 
     game.draw();
 
