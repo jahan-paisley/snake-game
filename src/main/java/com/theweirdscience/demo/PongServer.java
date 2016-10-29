@@ -43,10 +43,6 @@ public class PongServer {
     }
 
     public static void main(String[] args) throws Exception{
-        /*if (args.length != 1) {
-            System.err.println("Please give port as argument");
-            System.exit(1);
-        }*/
         int port = Integer.parseInt(args.length > 0 ? args[0]: "8080");
 
         final PongServer endpoint = new PongServer();

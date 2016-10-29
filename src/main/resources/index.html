@@ -14,6 +14,10 @@
             height: 15em;
         }
 
+        td {
+            vertical-align: top;
+        }
+
         body {
             padding: 0;
             margin: 0;
@@ -41,6 +45,11 @@
             <input type="text" id="url"/>
             <textarea id="log" disabled></textarea>
             <input type="submit" id="connect" value="Connect"/>
+        </td>
+        <td>
+            Users:
+            <select id="users" style="width: 150px;">
+            </select>
         </td>
     </tr>
 </table>
@@ -75,6 +84,7 @@
 
 
     var game = new Game(canvas);
+
 
     function Point(x, y) {
         this.x = x;
@@ -148,7 +158,7 @@
         }
 
         this.draw = function (canvas) {
-//            canvasElm.lineWidth = 1;
+            canvasElm.lineWidth = 2;
             canvas.strokeStyle = "red";
             canvas.beginPath();
             canvas.moveTo(this.dots[0].x, this.dots[0].y);
@@ -167,14 +177,14 @@
             this.canvas.fillRect(0, 0, window.innerWidth, window.innerHeight / 2);
             this.snake.draw(canvas);
             this.snake.move(canvas);
-            this.fillFruits()
+            this.fillFruits();
         }
 
         this.fillFruits = function () {
             for (var i = 0; i < this.fruits.length; i++) {
                 this.canvas.beginPath();
                 this.canvas.fillStyle = "yellow";
-                this.canvas.fillRect(this.fruits[i].x, this.fruits[i].y, 1, 1);
+                this.canvas.fillRect(this.fruits[i].x, this.fruits[i].y, 2, 2);
                 this.canvas.fillStyle = "black";
             }
         }
@@ -215,37 +225,57 @@
         } else {
             var ws = null;
             $('#connect').click(function () {
-                if (ws == null || ws.readyState != 1) {
-                    ws = new WebSocket($('#url').val());
-                    ws.onerror = function (e) {
-                        log('Error : ' + e.message);
-                    }
-                    ws.onopen = function () {
-                        log('connected');
-                    }
-                    ws.onclose = function () {
-                        log('disconnected');
-                    }
-                    ws.onmessage = function (d) {
-                        log('Response : ' + d.data);
-                    }
-                    $('#send').click(function () {
-                        var msg = $('#msg').val();
-                        $('#msg').val('');
-                        try {
-                            ws.send(msg);
-                            log('Message sent');
+                        if (ws == null || ws.readyState != 1) {
+                            ws = new WebSocket($('#url').val());
+                            ws.onerror = function (e) {
+                                log('Error : ' + e.message);
+                            }
+                            ws.onopen = function () {
+                                log('connected');
+                            }
+                            ws.onclose = function () {
+                                log('disconnected');
+                            }
+                            ws.onmessage = function (d) {
+                                if (d.data.startsWith("users")) {
+                                    var users = d.data.split(',').slice(1);
+                                    $('#users').find('option').remove();
+                                    _.each(users, function (user) {
+                                        $('#users').append($('<option>',
+                                                {
+                                                    value: user,
+                                                    text: user
+                                                }))
+                                    });
+                                }
+                                log(d.data);
+                            }
+                            $('#send').click(function () {
+                                var msg = $('#msg').val();
+                                $('#msg').val('');
+                                try {
+                                    if ($('#users').find(":selected")) {
+                                        ws.send(
+                                                $('#users').find(":selected").attr('value') + "|" + msg);
+                                        log('Message sent');
+                                    }
+                                    else {
+                                        alert("please choose a recipient!");
+                                    }
+                                }
+                                catch (ex) {
+                                    log('Message not sent due to' + ex);
+                                }
+                            })
                         }
-                        catch (ex) {
-                            log('Message not sent due to' + ex);
+                        else {
+                            log('closing connection');
+                            ws.close();
                         }
-                    })
-                } else {
-                    log('closing connection');
-                    ws.close();
-                }
-            });
+                    }
+            );
         }
-    });
+    })
+    ;
 </script>
 </html>

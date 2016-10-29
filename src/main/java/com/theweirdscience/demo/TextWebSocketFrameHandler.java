@@ -10,6 +10,8 @@ import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolHandler;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.StringJoiner;
+import java.util.stream.Collectors;
 
 public class TextWebSocketFrameHandler extends SimpleChannelInboundHandler<TextWebSocketFrame> {
     private final ChannelGroup group;
@@ -21,29 +23,51 @@ public class TextWebSocketFrameHandler extends SimpleChannelInboundHandler<TextW
 
     @Override
     public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
+        String chname = getRemoteAddress(ctx.channel());
         if (evt == WebSocketServerProtocolHandler.ServerHandshakeStateEvent.HANDSHAKE_COMPLETE) {
             ctx.pipeline().remove(HttpRequestHandler.class);
-            users.put("user" + ctx.channel().remoteAddress(), ctx.channel());
-            group.writeAndFlush(new TextWebSocketFrame("Client " + ctx.channel().remoteAddress() + " joined"));
+            users.put(chname, ctx.channel());
+            group.writeAndFlush(new TextWebSocketFrame("Client " + chname + " joined"));
             group.add(ctx.channel());
+            sendUsersToAll();
         } else {
             super.userEventTriggered(ctx, evt);
         }
     }
 
+    private void sendUsersToAll() {
+        for (Channel ch : group) {
+            String users = "users," + TextWebSocketFrameHandler
+                    .users
+                    .keySet()
+                    .stream()
+                    .filter(name -> {
+                        return !name.equals(ch);
+                    })
+                    .collect(Collectors.joining(","));
+            ch.writeAndFlush(new TextWebSocketFrame(users));
+        }
+    }
+
     @Override
     public void channelRead0(ChannelHandlerContext ctx, TextWebSocketFrame msg) throws Exception {
+        sendUsersToAll();
         msg.retain();
         String text = msg.text();
         String[] split = text.split("\\|");
-        Channel ch = users.get("user/" + split[0]);
+        Channel ch = users.get(split[0]);
         try {
-            if (ch != null)
-                ch.writeAndFlush(new TextWebSocketFrame("From:" + ctx.channel().remoteAddress().toString().substring(1) + ":" + split[1]));
-            else
+            if (ch != null) {
+                String chname = getRemoteAddress(ctx.channel());
+                ch.writeAndFlush(new TextWebSocketFrame("From:" + chname + ":" + split[1]));
+            } else
                 ctx.channel().writeAndFlush(new TextWebSocketFrame("probably client has been disconnected"));
         } catch (Exception e) {
             ctx.channel().writeAndFlush(new TextWebSocketFrame("exception happened:" + e.getMessage()));
         }
+    }
+
+    private String getRemoteAddress(Channel channel) {
+        return channel.remoteAddress().toString().substring(1);
     }
 }
