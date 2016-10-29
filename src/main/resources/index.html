@@ -241,22 +241,24 @@
                     }
                     ws.onmessage = function (d) {
                         if (d.data.startsWith("users")) {
-                            var users = d.data.split(',').slice(1);
+                            var users = JSON.parse(d.data.split('users,').slice(1));
                             if (users.length > 0) {
                                 $('#users').find('option').remove();
                                 _.each(users, function (user) {
-                                    $('#users').append($('<option>',
-                                            {
-                                                value: user,
-                                                text: user
-                                            }))
+                                    _.each(user, function (key, value) {
+                                        $('#users').append($('<option>',
+                                                {
+                                                    value: key,
+                                                    text: value
+                                                }))
+                                    });
                                 });
                             }
                         }
-                        else if(d.data.startsWith("game")){
+                        else if (d.data.indexOf("game,") != -1) {
                             var remoteGame = JSON.parse(d.data.split("game,")[1]);
-                            game.fruits= []
-                            _.each(remoteGame.fruits, function(value){
+                            game.fruits = []
+                            _.each(remoteGame.fruits, function (value) {
                                 game.fruits.push(new Point(value.x, value.y));
                             });
                             game.draw();
