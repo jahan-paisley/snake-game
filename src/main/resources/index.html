@@ -24,9 +24,11 @@
             overflow: hidden;
         }
     </style>
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
     <script src="https://cdn.jsdelivr.net/lodash/4.16.4/lodash.min.js"></script>
-</head>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+
 <body>
 <div id="not-supported" style="float: left; width: 600px; margin-left: 10px; display: none">
     <p>Uh-oh, the browser you're using doesn't have native support for WebSocket. That means you can't run this
@@ -34,22 +36,26 @@
     <p>The following link lists the browsers that support WebSocket:</p>
     <p><a href="http://caniuse.com/#feat=websockets">http://caniuse.com/#feat=websockets</a></p>
 </div>
-<table>
+<table class="table">
     <tr>
         <td>
-            <div>Enter a message below to send</div>
-            <input type="text" id="msg"/>
-            <input type="submit" value="Send" id="send"/>
-        </td>
-        <td id="ui">
-            <input type="text" id="url"/>
-            <textarea id="log" disabled></textarea>
-            <input type="submit" id="connect" value="Connect"/>
+            Connect to server
+            <input type="submit" class="btn" id="connect" value="Connect"/>
         </td>
         <td>
             Users:
-            <select id="users" style="width: 150px;">
+            <select id="users" class="form-control">
             </select>
+            <input type="submit" class="btn" id="play" value="Play"/>
+        </td>
+        <td>
+            <div>Enter a message below to send</div>
+            <input type="text" id="msg" class="form-control"/>
+            <input type="submit" class="btn" value="Send" id="send"/>
+        </td>
+        <td id="ui">
+            Log:
+            <textarea id="log" disabled></textarea>
         </td>
     </tr>
 </table>
@@ -84,7 +90,6 @@
 
 
     var game = new Game(canvas);
-
 
     function Point(x, y) {
         this.x = x;
@@ -175,8 +180,8 @@
 
         this.draw = function () {
             this.canvas.fillRect(0, 0, window.innerWidth, window.innerHeight / 2);
-            this.snake.draw(canvas);
-            this.snake.move(canvas);
+            this.snake.draw(this.canvas);
+            this.snake.move(this.canvas);
             this.fillFruits();
         }
 
@@ -218,64 +223,81 @@
     }
 
     $(function () {
-        $('#url').val((location.protocol.indexOf('https') == -1 ? 'ws://' : 'wss://') + location.host + '/ws');
+        var url = "ws://" + location.host + '/ws';
 
         if (!WebSocket) {
             $('#not-supported').show();
         } else {
             var ws = null;
             $('#connect').click(function () {
-                        if (ws == null || ws.readyState != 1) {
-                            ws = new WebSocket($('#url').val());
-                            ws.onerror = function (e) {
-                                log('Error : ' + e.message);
-                            }
-                            ws.onopen = function () {
-                                log('connected');
-                            }
-                            ws.onclose = function () {
-                                log('disconnected');
-                            }
-                            ws.onmessage = function (d) {
-                                if (d.data.startsWith("users")) {
-                                    var users = d.data.split(',').slice(1);
-                                    $('#users').find('option').remove();
-                                    _.each(users, function (user) {
-                                        $('#users').append($('<option>',
-                                                {
-                                                    value: user,
-                                                    text: user
-                                                }))
-                                    });
-                                }
-                                log(d.data);
-                            }
-                            $('#send').click(function () {
-                                var msg = $('#msg').val();
-                                $('#msg').val('');
-                                try {
-                                    if ($('#users').find(":selected")) {
-                                        ws.send(
-                                                $('#users').find(":selected").attr('value') + "|" + msg);
-                                        log('Message sent');
-                                    }
-                                    else {
-                                        alert("please choose a recipient!");
-                                    }
-                                }
-                                catch (ex) {
-                                    log('Message not sent due to' + ex);
-                                }
-                            })
-                        }
-                        else {
-                            log('closing connection');
-                            ws.close();
-                        }
+                if (ws == null || ws.readyState != 1) {
+                    ws = new WebSocket(url);
+                    ws.onerror = function (e) {
+                        log('Error : ' + e.message);
                     }
-            );
+                    ws.onopen = function () {
+                        log('connected');
+                        $("#connect").prop('disabled', true)
+                    }
+                    ws.onclose = function () {
+                        log('disconnected');
+                    }
+                    ws.onmessage = function (d) {
+                        if (d.data.startsWith("users")) {
+                            var users = d.data.split(',').slice(1);
+                            if (users.length > 0) {
+                                $('#users').find('option').remove();
+                                _.each(users, function (user) {
+                                    $('#users').append($('<option>',
+                                            {
+                                                value: user,
+                                                text: user
+                                            }))
+                                });
+                            }
+                        }
+                        else if(d.data.startsWith("game")){
+                            var remoteGame = JSON.parse(d.data.split("game,")[1]);
+                            game.fruits= []
+                            _.each(remoteGame.fruits, function(value){
+                                game.fruits.push(new Point(value.x, value.y));
+                            });
+                            game.draw();
+                        }
+                        else
+                            log(d.data);
+                    }
+                    $('#send').click(function () {
+                        var msg = $('#msg').val();
+                        $('#msg').val('');
+                        try {
+                            if ($('#users').val()) {
+                                ws.send($('#users').val() + "|" + msg);
+                                log('Message sent');
+                            }
+                            else {
+                                alert("please choose a recipient!");
+                            }
+                        }
+                        catch (ex) {
+                            log('Message not sent due to' + ex);
+                        }
+                    })
+                }
+                else {
+                    log('closing connection');
+                    ws.close();
+                }
+            });
+            $('#play').click(function () {
+                var opponent = $('#users').val();
+                if (opponent) {
+                    ws.send(opponent + "|" + "game," + JSON.stringify(game));
+                }
+                else
+                    alert("please choose opponent!");
+            });
         }
-    })
-    ;
+    });
 </script>
 </html>

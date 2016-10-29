@@ -35,6 +35,13 @@ public class TextWebSocketFrameHandler extends SimpleChannelInboundHandler<TextW
         }
     }
 
+    @Override
+    public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+        super.channelInactive(ctx);
+        users.remove(getRemoteAddress(ctx.channel()));
+        sendUsersToAll();
+    }
+
     private void sendUsersToAll() {
         for (Channel ch : group) {
             String users = "users," + TextWebSocketFrameHandler
@@ -42,7 +49,7 @@ public class TextWebSocketFrameHandler extends SimpleChannelInboundHandler<TextW
                     .keySet()
                     .stream()
                     .filter(name -> {
-                        return !name.equals(ch);
+                        return !name.equals(getRemoteAddress(ch));
                     })
                     .collect(Collectors.joining(","));
             ch.writeAndFlush(new TextWebSocketFrame(users));
@@ -51,7 +58,6 @@ public class TextWebSocketFrameHandler extends SimpleChannelInboundHandler<TextW
 
     @Override
     public void channelRead0(ChannelHandlerContext ctx, TextWebSocketFrame msg) throws Exception {
-        sendUsersToAll();
         msg.retain();
         String text = msg.text();
         String[] split = text.split("\\|");
@@ -59,7 +65,7 @@ public class TextWebSocketFrameHandler extends SimpleChannelInboundHandler<TextW
         try {
             if (ch != null) {
                 String chname = getRemoteAddress(ctx.channel());
-                ch.writeAndFlush(new TextWebSocketFrame("From:" + chname + ":" + split[1]));
+                ch.writeAndFlush(new TextWebSocketFrame(split[1]));
             } else
                 ctx.channel().writeAndFlush(new TextWebSocketFrame("probably client has been disconnected"));
         } catch (Exception e) {
