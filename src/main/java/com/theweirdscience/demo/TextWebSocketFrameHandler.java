@@ -46,7 +46,7 @@ public class TextWebSocketFrameHandler extends SimpleChannelInboundHandler<TextW
 
     private void sendUsersToAll() {
         for (Channel ch : group) {
-            String users1 = "users," + users.entrySet()
+            String users1 = "users_updated," + users.entrySet()
                     .stream()
                     .filter(entry -> !entry.getKey().remoteAddress.equals(ch.remoteAddress()))
                     .map(entry -> String.format("{\"%S\": \"%S\"}", entry.getKey().name, entry.getKey().remoteAddress))
@@ -55,12 +55,12 @@ public class TextWebSocketFrameHandler extends SimpleChannelInboundHandler<TextW
         }
     }
 
-    public Channel findChannelByRemoteAddress(String address) {
+    public Optional<Channel> findChannelByRemoteAddress(String address) {
         return users.entrySet()
                 .stream()
                 .filter(x -> x.getKey().remoteAddress.toString().equals(address))
                 .map(x -> x.getValue())
-                .findFirst().get();
+                .findFirst();
     }
 
     public String findName(SocketAddress remoteAddress) {
@@ -84,11 +84,11 @@ public class TextWebSocketFrameHandler extends SimpleChannelInboundHandler<TextW
         msg.retain();
         String text = msg.text();
         String[] split = text.split("\\|");
-        Channel ch = findChannelByRemoteAddress(split[0]);
+        Optional<Channel> ch = findChannelByRemoteAddress(split[0]);
         try {
-            if (ch != null) {
+            if (ch.isPresent()) {
                 String sender = findName(ctx.channel().remoteAddress());
-                ch.writeAndFlush(new TextWebSocketFrame(sender + ":" + split[1]));
+                ch.get().writeAndFlush(new TextWebSocketFrame(sender + ":" + split[1]));
             } else
                 ctx.channel().writeAndFlush(new TextWebSocketFrame("probably client has been disconnected"));
         } catch (Exception e) {
