@@ -58,7 +58,7 @@
         </td>
     </tr>
 </table>
-<h4>Click to start a game!</h4>
+<h4>Click play and wait for accept to start a match!</h4>
 <canvas id="canvas" tabindex="1"></canvas>
 </body>
 <script type="text/javascript">
@@ -212,28 +212,22 @@
     /* ---------------------------------------------------------------------------- */
 
     // RequestAnimFrame: a browser API for getting smooth animations
-    window.requestAnimFrame = window.requestAnimationFrame ||
-            window.webkitRequestAnimationFrame ||
-            window.mozRequestAnimationFrame ||
-            window.oRequestAnimationFrame ||
-            window.msRequestAnimationFrame || (function () {
-                return function (callback) {
-                    return window.setTimeout(callback, 1000 / 10);
-                };
-            })();
-    window.cancelRequestAnimFrame = window.cancelAnimationFrame ||
-            window.webkitCancelRequestAnimationFrame ||
-            window.mozCancelRequestAnimationFrame ||
-            window.oCancelRequestAnimationFrame ||
-            window.msCancelRequestAnimationFrame || (function () {
-                return clearTimeout;
-            })();
+    window.requestAnimFrame = (function () {
+        return function (callback) {
+            return window.setTimeout(callback, 1000 / 10);
+        };
+    })();
+    window.cancelRequestAnimFrame = (function () {
+        return clearTimeout;
+    })();
 
     // Initialize canvasElm and required variables
     var canvasElm = document.getElementById("canvas"),
-            $canvas = canvasElm.getContext("2d");
-    canvasElm.width = window.innerWidth;
-    canvasElm.height = window.innerHeight / 2;
+            $canvas = canvasElm.getContext("2d"),
+            W = window.innerWidth,
+            H = window.innerHeight / 2;
+    canvasElm.width = W;
+    canvasElm.height = H;
 
     var $game = new Game();
 
@@ -287,10 +281,10 @@
     function Snake() {
         this.dots = [];
         this.startedMoving = false;
-
+        this.moves = 0;
         var randStart = Math.floor((Math.random() * 100) + 1);
         for (var i = randStart; i < randStart + 30; i++) {
-            this.dots.push(new Point(10, i));
+            this.dots.push(new Point(20, i));
         }
 
         this.direction = 'd';
@@ -323,6 +317,7 @@
                 this.dots = this.dots.slice(1);
                 game1.triggerEvent(EVENTS.SNAKE_MOVED, game1.snake.dots[game1.snake.dots.length - 1]);
             }
+            this.moves++;
         };
 
         this.draw = function () {
@@ -340,18 +335,43 @@
         this.snake = new Snake();
         this.rsnake = new Snake();
         this.rsnake.dots = [];
-
         this.fruits = [];
         this.opponent = null;
         this.init = null;
 
         this.draw = function () {
-            $canvas.fillRect(0, 0, window.innerWidth, window.innerHeight / 2);
+            $canvas.fillRect(0, 0, W, H);
             this.snake.draw();
             if (this.rsnake.dots.length > 0)this.rsnake.draw();
             this.snake.move(this);
             this.drawFruits();
+            if (this.snake.moves > 30)
+                this.checkFailure();
         };
+
+        this.checkFailure = function () {
+            var sortedDots = _.orderBy(this.snake.dots, ['x', 'y']);
+            for (var i = 0; i < sortedDots.length - 1; i++) {
+                if (sortedDots[i].equals(sortedDots[i + 1]))
+                    alert("You Lost!");
+            }
+            if (this.rsnake.startedMoving) {
+                var rsortedDots = _.orderBy(this.rsnake.dots, ['x', 'y']);
+                for (var i = 0; i < rsortedDots.length - 1; i++) {
+                    if (rsortedDots[i].equals(rsortedDots[i + 1]))
+                        alert("You Won!");
+                }
+            }
+            if (this.rsnake.startedMoving)
+                if (_.findIndex(this.rsnake.dots, this.snake.dots[this.snake.dots.length - 1]) != -1)
+                    alert("You Lost!");
+
+            if ((this.rsnake.length > 0)) {
+                var lastp = this.rsnake.dots[this.rsnake.dots.length - 1];
+                if (_.findIndex(this.snake.dots, {x: lastp.x, y: lastp.y}) != -1)
+                    alert("You Won!");
+            }
+        }
 
         this.drawFruits = function () {
             for (var i = 0; i < this.fruits.length; i++) {
@@ -364,9 +384,9 @@
 
         this.genFruits = function () {
             for (var i = 0; i < 50; i++) {
-                var x = Math.floor((Math.random() * window.innerWidth) + 1);
+                var x = Math.floor((Math.random() * W) + 1);
                 x = x - x % 5;
-                var y = Math.floor((Math.random() * window.innerHeight / 2) + 1);
+                var y = Math.floor((Math.random() * H) + 1);
                 y = y - y % 5;
                 if (_.findIndex(this.fruits, {x: x, y: y}) == -1 && x >= 0 && y >= 0)
                     this.fruits.push(new Point(x, y));
@@ -393,7 +413,7 @@
                     $canvas.font = "20px Arial, sans-serif";
                     $canvas.textAlign = "center";
                     $canvas.textBaseline = "middle";
-                    $canvas.fillText("You Won!", window.innerWidth / 2, window.innerHeight / 4 + 25);
+                    $canvas.fillText("You Won!", W / 2, H / 2 + 25);
                     cancelRequestAnimFrame($game.init);
             }
         }
