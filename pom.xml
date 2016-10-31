@@ -2,8 +2,8 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.theweirdscience.demo</groupId>
-    <artifactId>pong</artifactId>
-    <name>pong</name>
+    <artifactId>snake-game</artifactId>
+    <name>snake-game</name>
     <version>0.1-SNAPSHOT</version>
     <build>
         <plugins>
@@ -86,7 +86,10 @@
     </properties>
     <profiles>
         <profile>
-            <id>GameServer</id>
+            <id>SnakeServer</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
             <build>
                 <plugins>
                     <plugin>
@@ -106,12 +109,12 @@
                 </plugins>
             </build>
             <properties>
-                <mainClass>com.theweirdscience.demo.PongServer</mainClass>
+                <mainClass>com.theweirdscience.demo.SnakeServer</mainClass>
                 <port>9999</port>
             </properties>
         </profile>
         <profile>
-            <id>SecureGameServer</id>
+            <id>SecureSnakeServer</id>
             <build>
                 <plugins>
                     <plugin>
@@ -131,7 +134,7 @@
                 </plugins>
             </build>
             <properties>
-                <mainClass>com.theweirdscience.demo.SecurePongServer</mainClass>
+                <mainClass>com.theweirdscience.demo.SecureSnakeServer</mainClass>
                 <port>9999</port>
             </properties>
         </profile>

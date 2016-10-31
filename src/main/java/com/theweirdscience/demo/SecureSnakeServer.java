@@ -9,17 +9,17 @@ import io.netty.handler.ssl.util.SelfSignedCertificate;
 
 import java.net.InetSocketAddress;
 
-public class SecurePongServer extends PongServer {
+public class SecureSnakeServer extends SnakeServer {
 
     private final SslContext context;
 
-    public SecurePongServer(SslContext context) {
+    public SecureSnakeServer(SslContext context) {
         this.context = context;
     }
 
     @Override
     protected ChannelInitializer<Channel> createInitializer(ChannelGroup group) {
-        return new SecureGameServerChannelIntializer(group, context);
+        return new SecureSnakeServerChannelIntializer(group, context);
     }
 
     public static void main(String[] args) throws Exception{
@@ -30,7 +30,7 @@ public class SecurePongServer extends PongServer {
         int port = Integer.parseInt(args[0]);
         SelfSignedCertificate cert = new SelfSignedCertificate();
         SslContext context = SslContext.newServerContext(cert.certificate(), cert.privateKey());
-        final SecurePongServer endpoint = new SecurePongServer(context);
+        final SecureSnakeServer endpoint = new SecureSnakeServer(context);
         ChannelFuture future = endpoint.start(new InetSocketAddress(port));
 
         Runtime.getRuntime().addShutdownHook(new Thread() {

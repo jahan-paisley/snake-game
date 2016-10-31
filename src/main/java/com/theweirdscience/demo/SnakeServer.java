@@ -13,7 +13,7 @@ import io.netty.util.concurrent.ImmediateEventExecutor;
 
 import java.net.InetSocketAddress;
 
-public class PongServer {
+public class SnakeServer {
 
     private final ChannelGroup channelGroup = new DefaultChannelGroup(ImmediateEventExecutor.INSTANCE);
     private final EventLoopGroup group = new NioEventLoopGroup();
@@ -31,7 +31,7 @@ public class PongServer {
     }
 
     protected ChannelInitializer<Channel> createInitializer(ChannelGroup group) {
-       return new GameServerChannelInitializer(group);
+       return new SnakeServerChannelInitializer(group);
     }
 
     public void destroy() {
@@ -45,7 +45,7 @@ public class PongServer {
     public static void main(String[] args) throws Exception{
         int port = Integer.parseInt(args.length > 0 ? args[0]: "8080");
 
-        final PongServer endpoint = new PongServer();
+        final SnakeServer endpoint = new SnakeServer();
         ChannelFuture future = endpoint.start(new InetSocketAddress(port));
 
         Runtime.getRuntime().addShutdownHook(new Thread() {

@@ -58,60 +58,56 @@
         </td>
     </tr>
 </table>
-<h4>Click to start a game!</h4>
+<h4>Click play and wait for accept to start a match!</h4>
 <canvas id="canvas" tabindex="1"></canvas>
 </body>
 <script type="text/javascript">
+    (function (window) {
+        /* ---------------------------------------------------------------------------- */
+        /* -------------------------   WS section   ----------------------------------- */
+        /* ---------------------------------------------------------------------------- */
 
-    /* ---------------------------------------------------------------------------- */
-    /* -------------------------   WS section   ----------------------------------- */
-    /* ---------------------------------------------------------------------------- */
+        function log(msg) {
+            $('#log').append(msg + " \n").scrollTop(log[0].scrollHeight - log.height());
+        }
 
-    function log(msg) {
-        var log = $('#log');
-        log.append(msg + " \n").scrollTop(log[0].scrollHeight - log.height());
-    }
+        function Communication() {
+            this.ws = null;
 
-    var ws = null;
+            this.setup = function () {
+                var url = "ws://" + location.host + '/ws';
 
-    function Communication() {
-        this.ws = null;
+                if (!WebSocket) {
+                    $('#not-supported').show();
+                } else {
+                    var that = this;
+                    $('#connect').click(function () {
+                        if (that.ws == null || that.ws.readyState != 1) {
+                            that.ws = new WebSocket(url);
+                            that.bindCallbacks();
+                        }
+                        else {
+                            log('closing connection');
+                            that.ws.close();
+                        }
+                    });
+                }
+            };
 
-        this.setup = function () {
-            var url = "ws://" + location.host + '/ws';
-
-            if (!WebSocket) {
-                $('#not-supported').show();
-            } else {
-                var that = this;
-                $('#connect').click(function () {
-                    if (that.ws == null || that.ws.readyState != 1) {
-                        that.ws = new WebSocket(url);
-                        that.bindCallbacks();
-                    }
-                    else {
-                        log('closing connection');
-                        that.ws.close();
-                    }
-                });
-            }
-        };
-
-        this.bindCallbacks = function () {
-            this.ws.onerror = function (e) {
-                log('Error : ' + e.message);
-            }
-            this.ws.onopen = function () {
-                log('connected');
-                $("#connect").prop('disabled', true)
-            }
-            this.ws.onclose = function () {
-                log('disconnected');
-            }
-            this.ws.onmessage = function (d) {
-                if (d.data.startsWith("users_updated,")) {
-                    var players = JSON.parse(d.data.split('users_updated,').slice(1));
-                    if (players.length > 0) {
+            this.bindCallbacks = function () {
+                this.ws.onerror = function (e) {
+                    log('Error : ' + e.message);
+                }
+                this.ws.onopen = function () {
+                    log('connected');
+                    $("#connect").prop('disabled', true)
+                }
+                this.ws.onclose = function () {
+                    log('disconnected');
+                }
+                this.ws.onmessage = function (d) {
+                    if (d.data.startsWith("users_updated,")) {
+                        var players = JSON.parse(d.data.split('users_updated,').slice(1));
                         $('#players').find('option').remove();
                         _.each(players, function (player) {
                             _.each(player, function (key, value) {
@@ -123,296 +119,337 @@
                             });
                         });
                     }
+                    else if (d.data.indexOf(EVENTS.GAME_INIT + ",") != -1) {
+                        var remoteGame = JSON.parse(d.data.split(EVENTS.GAME_INIT + ",")[1]);
+                        var resp = prompt("Do you want to start a game?", "Yes");
+                        if (resp == "Yes") {
+                            $game.handleEvent(EVENTS.GAME_INIT, remoteGame)
+                        }
+                    }
+                    else if (d.data.indexOf(EVENTS.GAME_INIT_REPLY + ",") != -1) {
+                        var remoteGame = JSON.parse(d.data.split(EVENTS.GAME_INIT_REPLY + ",")[1]);
+                        $game.handleEvent(EVENTS.GAME_INIT_REPLY, remoteGame);
+                    }
+                    else if (d.data.indexOf(EVENTS.SNAKE_MOVED) != -1) {
+                        var newpoint = JSON.parse(d.data.split(EVENTS.SNAKE_MOVED + ",")[1]);
+                        $game.handleEvent(EVENTS.SNAKE_MOVED, newpoint);
+                    }
+                    else if (d.data.indexOf(EVENTS.FRUIT_EATEN) != -1) {
+                        var fruit = JSON.parse(d.data.split(EVENTS.FRUIT_EATEN + ",")[1]);
+                        $game.handleEvent(EVENTS.FRUIT_EATEN, fruit);
+                    }
+                    else if (d.data.indexOf(EVENTS.R_LOST) != -1) {
+                        $game.handleEvent(EVENTS.R_LOST)
+                    }
+                    else if (d.data.indexOf(EVENTS.R_WON) != -1) {
+                        $game.handleEvent(EVENTS.R_WON)
+                    }
+                    else
+                        log(d.data);
                 }
-                else if (d.data.indexOf(EVENTS.GAME_INIT + ",") != -1) {
-                    var remoteGame = JSON.parse(d.data.split(EVENTS.GAME_INIT + ",")[1]);
-                    var resp = prompt("Do you want to start a game?", "Yes");
-                    if (resp == "Yes") {
-                        $game.fruits = [];
-                        _.each(remoteGame.fruits, function (value) {
-                            $game.fruits.push(new Point(value.x, value.y));
-                        });
-                        $game.rsnake.dots = [];
-                        _.each(remoteGame.snake.dots, function (value) {
-                            $game.rsnake.dots.push(new Point(value.x, value.y));
-                        });
-                        $game.rsnake.startedMoving = true;
-                        $game.triggerEvent(EVENTS.GAME_INIT_REPLY, $game);
-                        $game.draw();
+            }
+        }
+
+        var $comm = new Communication();
+        $comm.setup();
+
+        $('#send').click(function () {
+            var msg = $('#msg').val();
+            $('#msg').val('');
+            try {
+                if ($('#players').val()) {
+                    $comm.ws.send($('#players').val() + "|" + msg);
+                    log('Message sent');
+                }
+                else {
+                    alert("please choose a recipient!");
+                }
+            }
+            catch (ex) {
+                log('Message not sent due to' + ex);
+            }
+
+        });
+
+        $('#play').click(function () {
+            var opponent = $('#players').val();
+            if (opponent) {
+                $game.opponent = $("#players").val();
+                $game.triggerEvent(EVENTS.GAME_INIT, $game)
+            }
+            else
+                alert("please choose opponent!");
+        });
+
+
+        /* ---------------------------------------------------------------------------- */
+        /* -----------------   Canvas Game related section    -------------------------- */
+        /* ---------------------------------------------------------------------------- */
+
+        // RequestAnimFrame: a browser API for getting smooth animations
+        window.requestAnimFrame = (function () {
+            return function (callback) {
+                return window.setTimeout(callback, 1000 / 10);
+            };
+        })();
+        window.cancelRequestAnimFrame = (function () {
+            return clearTimeout;
+        })();
+
+        // Initialize canvasElm and required variables
+        var canvasElm = document.getElementById("canvas"),
+                $canvas = canvasElm.getContext("2d"),
+                W = window.innerWidth,
+                H = window.innerHeight / 2;
+        canvasElm.width = W;
+        canvasElm.height = H;
+        var UNIT = 1;
+        var $game = new Game();
+
+        var EVENTS = Object.freeze({
+            FRUIT_EATEN: "FRUIT_EATEN",
+            SNAKE_MOVED: "SNAKE_MOVED",
+            R_LOST: "R_LOST",
+            R_WON: "R_WON",
+            GAME_INIT: "GAME_INIT",
+            GAME_INIT_REPLY: "GAME_INIT_REPLY"
+        });
+
+        function Point(x, y) {
+            this.x = x;
+            this.y = y;
+            this.next = function (direction) {
+                var nextp = new Point(this.x, this.y);
+                switch (direction) {
+                    case 'r':
+                        nextp.x += UNIT;
+                        break;
+                    case 'l':
+                        nextp.x -= UNIT;
+                        break;
+                    case 'u':
+                        nextp.y -= UNIT;
+                        break;
+                    case 'd':
+                        nextp.y += UNIT;
+                        break;
+                }
+                return nextp;
+            }
+
+            this.equals = function (b) {
+                try {
+                    if (this.x === b.x && this.y === b.y) {
+                        return true;
+                    }
+                    return false;
+                }
+                catch (e) {
+                    return false;
+                }
+            }
+        }
+
+        function Snake() {
+            this.dots = [];
+            this.startedMoving = false;
+            this.moves = 0;
+            var randStart = Math.floor((Math.random() * 100) + 1);
+            for (var i = randStart; i < randStart + 30; i++) {
+                this.dots.push(new Point(20, i));
+            }
+
+            this.direction = 'd';
+
+            this.turn = function (dir) {
+                if (['r', 'l', 'u', 'd'].indexOf(dir) == -1)
+                    return;
+                if (this.validMove(dir))
+                    this.direction = dir;
+            };
+
+            this.validMove = function (dir) {
+                var last2p = this.dots[this.dots.length - 2];
+                var lastp = this.dots[this.dots.length - 1];
+                if (lastp.next(dir).equals(last2p))
+                    return false;
+                return true;
+            };
+
+            this.move = function (game1) {
+                var lastp = this.dots[this.dots.length - 1];
+                var nextp = lastp.next(this.direction);
+                var fruitInx = _.findIndex(game1.fruits, {x: lastp.x, y: lastp.y});
+                this.dots.push(nextp);
+                if (fruitInx != -1) {
+                    game1.triggerEvent(EVENTS.FRUIT_EATEN, game1.fruits[fruitInx]);
+                    game1.fruits.splice(fruitInx, 1);
+                }
+                else {
+                    this.dots = this.dots.slice(1);
+                    game1.triggerEvent(EVENTS.SNAKE_MOVED, game1.snake.dots[game1.snake.dots.length - 1]);
+                }
+                this.moves++;
+            };
+
+            this.draw = function () {
+                $canvas.lineWidth = UNIT;
+                $canvas.strokeStyle = "red";
+                $canvas.beginPath();
+                $canvas.moveTo(this.dots[0].x, this.dots[0].y);
+                for (var i = 0; i < this.dots.length; ++i)
+                    $canvas.lineTo(this.dots[i].x, this.dots[i].y);
+                $canvas.stroke();
+            }
+        }
+
+        function Game() {
+            this.snake = new Snake();
+            this.rsnake = new Snake();
+            this.rsnake.dots = [];
+            this.fruits = [];
+            this.opponent = null;
+            this.init = null;
+
+            this.draw = function () {
+                $canvas.fillRect(0, 0, W, H);
+                this.snake.draw();
+                if (this.rsnake.dots.length > 0)this.rsnake.draw();
+                this.snake.move(this);
+                this.drawFruits();
+                if (this.snake.moves > 30)
+                    this.checkFailure();
+            };
+
+            this.checkFailure = function () {
+                var sortedDots = _.orderBy(this.snake.dots, ['x', 'y']);
+                for (var i = 0; i < sortedDots.length - 1; i++) {
+                    if (sortedDots[i].equals(sortedDots[i + 1])) {
+                        alert("You Lost!");
+                        this.triggerEvent(EVENTS.OPPONENT_LOST);
+                        cancelRequestAnimFrame(this.init);
                     }
                 }
-                else if (d.data.indexOf(EVENTS.GAME_INIT_REPLY + ",") != -1) {
-                    var remoteGame = JSON.parse(d.data.split(EVENTS.GAME_INIT_REPLY + ",")[1]);
-                    $game.rsnake.dots = [];
-                    _.each(remoteGame.snake.dots, function (value) {
-                        $game.rsnake.dots.push(new Point(value.x, value.y));
-                    });
-                    $game.rsnake.startedMoving = true;
+                if (this.rsnake.startedMoving) {
+                    var rsortedDots = _.orderBy(this.rsnake.dots, ['x', 'y']);
+                    for (var i = 0; i < rsortedDots.length - 1; i++) {
+                        if (rsortedDots[i].equals(rsortedDots[i + 1])) {
+                            this.triggerEvent(EVENTS.OPPONENT_WON);
+                            alert("You Won!");
+                            cancelRequestAnimFrame(this.init);
+                        }
+                    }
                 }
-                /*
-                 else if (d.data.indexOf(EVENTS.GAME_INIT_REPLY_ACK + ",") != -1) {
-                 var remoteGame = JSON.parse(d.data.split(EVENTS.GAME_INIT_REPLY_ACK + ",")[1]);
-                 $game.rsnake.startedMoving = true;
-                 }
-                 */
-
-                else if (d.data.indexOf(EVENTS.SNAKE_MOVED) != -1) {
-                    var newpoint = JSON.parse(d.data.split(EVENTS.SNAKE_MOVED + ",")[1]);
-                    $game.rsnake.dots = $game.rsnake.dots.slice(1);
-                    $game.rsnake.dots.push(new Point(newpoint.x, newpoint.y));
+                if (this.rsnake.startedMoving) {
+                    var dot = this.snake.dots[this.snake.dots.length - 1];
+                    if (_.findIndex(this.rsnake.dots, {x: dot.x, y: dot.y}) != -1) {
+                        alert("You Lost!");
+                        this.triggerEvent(EVENTS.OPPONENT_LOST);
+                        cancelRequestAnimFrame(this.init);
+                    }
                 }
-                else if (d.data.indexOf(EVENTS.FRUIT_EATEN) != -1) {
-                    var fruit = JSON.parse(d.data.split(EVENTS.FRUIT_EATEN + ",")[1]);
-                    var findex = _.findIndex($game.fruits, {x: fruit.x, y: fruit.y});
-                    $game.fruits.splice(findex, 1);
-                    $game.rsnake.dots.push(new Point(fruit.x, fruit.y));
+                if ((this.rsnake.length > 0)) {
+                    var lastp = this.rsnake.dots[this.rsnake.dots.length - 1];
+                    if (_.findIndex(this.snake.dots, {x: lastp.x, y: lastp.y}) != -1) {
+                        this.triggerEvent(EVENTS.OPPONENT_WON);
+                        alert("You Won!");
+                        cancelRequestAnimFrame(this.init);
+                    }
                 }
-                else
-                    log(d.data);
             }
-        }
-        ;
 
-        this.setup();
-    }
-
-    var $comm = new Communication();
-
-    $('#send').click(function () {
-        var msg = $('#msg').val();
-        $('#msg').val('');
-        try {
-            if ($('#players').val()) {
-                $comm.ws.send($('#players').val() + "|" + msg);
-                log('Message sent');
-            }
-            else {
-                alert("please choose a recipient!");
-            }
-        }
-        catch (ex) {
-            log('Message not sent due to' + ex);
-        }
-
-    });
-
-    $('#play').click(function () {
-        var opponent = $('#players').val();
-        if (opponent) {
-            $game.opponent = $("#players").val();
-            $game.triggerEvent(EVENTS.GAME_INIT, $game)
-        }
-        else
-            alert("please choose opponent!");
-    });
-
-
-    /* ---------------------------------------------------------------------------- */
-    /* -----------------   Canvas Game related section    -------------------------- */
-    /* ---------------------------------------------------------------------------- */
-
-    // RequestAnimFrame: a browser API for getting smooth animations
-    window.requestAnimFrame = window.requestAnimationFrame ||
-            window.webkitRequestAnimationFrame ||
-            window.mozRequestAnimationFrame ||
-            window.oRequestAnimationFrame ||
-            window.msRequestAnimationFrame || (function () {
-                return function (callback) {
-                    return window.setTimeout(callback, 1000 / 10);
-                };
-            })();
-    window.cancelRequestAnimFrame = window.cancelAnimationFrame ||
-            window.webkitCancelRequestAnimationFrame ||
-            window.mozCancelRequestAnimationFrame ||
-            window.oCancelRequestAnimationFrame ||
-            window.msCancelRequestAnimationFrame || (function () {
-                return clearTimeout;
-            })();
-
-    // Initialize canvasElm and required variables
-    var canvasElm = document.getElementById("canvas"),
-            $canvas = canvasElm.getContext("2d");
-    canvasElm.width = window.innerWidth;
-    canvasElm.height = window.innerHeight / 2;
-
-    var $game = new Game();
-
-    var EVENTS = Object.freeze({
-        FRUIT_EATEN: "FRUIT_EATEN",
-        SNAKE_MOVED: "SNAKE_MOVED",
-        OPPONENT_LOST: "OPPONENT_LOST",
-        GAME_INIT: "GAME_INIT",
-        GAME_INIT_REPLY: "GAME_INIT_REPLY",
-        GAME_INIT_REPLY_ACK: "GAME_INIT_REPLY_ACK"
-    });
-
-    var UNIT = 1;
-
-    function Point(x, y) {
-        this.x = x;
-        this.y = y;
-
-        this.next = function (direction) {
-            var nextp = new Point(this.x, this.y);
-            switch (direction) {
-                case 'r':
-                    nextp.x += UNIT;
-                    break;
-                case 'l':
-                    nextp.x -= UNIT;
-                    break;
-                case 'u':
-                    nextp.y -= UNIT;
-                    break;
-                case 'd':
-                    nextp.y += UNIT;
-                    break;
-            }
-            return nextp;
-        }
-
-        this.equals = function (b) {
-            try {
-                if (this.x === b.x && this.y === b.y) {
-                    return true;
+            this.drawFruits = function () {
+                for (var i = 0; i < this.fruits.length; i++) {
+                    $canvas.beginPath();
+                    $canvas.fillStyle = "yellow";
+                    $canvas.fillRect(this.fruits[i].x, this.fruits[i].y, UNIT, UNIT);
+                    $canvas.fillStyle = "black";
                 }
-                return false;
-            }
-            catch (e) {
-                return false;
-            }
-        }
-    }
+            };
 
-    function Snake() {
-        this.dots = [];
-        this.startedMoving = false;
+            this.genFruits = function () {
+                for (var i = 0; i < 50; i++) {
+                    var x = Math.floor((Math.random() * W) + 1);
+                    x = x - x % UNIT;
+                    var y = Math.floor((Math.random() * H) + 1);
+                    y = y - y % UNIT;
+                    if (_.findIndex(this.fruits, {x: x, y: y}) == -1 && x >= 0 && y >= 0)
+                        this.fruits.push(new Point(x, y));
+                    else
+                        i--;
+                }
+            };
 
-        var randStart = Math.floor((Math.random() * 100) + 1);
-        for (var i = randStart; i < randStart + 30; i++) {
-            this.dots.push(new Point(10, i));
-        }
+            this.genFruits();
 
-        this.direction = 'd';
+            this.triggerEvent = function (event, args) {
+                if ($comm.ws)
+                    $comm.ws.send((this.opponent || $("#players").val()) + "|" + event + "," + JSON.stringify(args))
+            };
 
-        this.turn = function (dir) {
-            if (['r', 'l', 'u', 'd'].indexOf(dir) == -1)
-                return;
-            if (this.validMove(dir))
-                this.direction = dir;
-        };
-
-        this.validMove = function (dir) {
-            var last2p = this.dots[this.dots.length - 2];
-            var lastp = this.dots[this.dots.length - 1];
-            if (lastp.next(dir).equals(last2p))
-                return false;
-            return true;
-        };
-
-        this.move = function (game1) {
-            var lastp = this.dots[this.dots.length - 1];
-            var nextp = lastp.next(this.direction);
-            var fruitInx = _.findIndex(game1.fruits, {x: lastp.x, y: lastp.y});
-            this.dots.push(nextp);
-            if (fruitInx != -1) {
-                game1.triggerEvent(EVENTS.FRUIT_EATEN, game1.fruits[fruitInx]);
-                game1.fruits.splice(fruitInx, 1);
-            }
-            else {
-                this.dots = this.dots.slice(1);
-                game1.triggerEvent(EVENTS.SNAKE_MOVED, game1.snake.dots[game1.snake.dots.length - 1]);
-            }
-        };
-
-        this.draw = function () {
-            $canvas.lineWidth = UNIT;
-            $canvas.strokeStyle = "red";
-            $canvas.beginPath();
-            $canvas.moveTo(this.dots[0].x, this.dots[0].y);
-            for (var i = 0; i < this.dots.length; ++i)
-                $canvas.lineTo(this.dots[i].x, this.dots[i].y);
-            $canvas.stroke();
-        }
-    }
-
-    function Game() {
-        this.snake = new Snake();
-        this.rsnake = new Snake();
-        this.rsnake.dots = [];
-
-        this.fruits = [];
-        this.opponent = null;
-        this.init = null;
-
-        this.draw = function () {
-            $canvas.fillRect(0, 0, window.innerWidth, window.innerHeight / 2);
-            this.snake.draw();
-            if (this.rsnake.dots.length > 0)this.rsnake.draw();
-            this.snake.move(this);
-            this.drawFruits();
-        };
-
-        this.drawFruits = function () {
-            for (var i = 0; i < this.fruits.length; i++) {
-                $canvas.beginPath();
-                $canvas.fillStyle = "yellow";
-                $canvas.fillRect(this.fruits[i].x, this.fruits[i].y, UNIT, UNIT);
-                $canvas.fillStyle = "black";
-            }
-        };
-
-        this.genFruits = function () {
-            for (var i = 0; i < 50; i++) {
-                var x = Math.floor((Math.random() * window.innerWidth) + 1);
-                x = x - x % 5;
-                var y = Math.floor((Math.random() * window.innerHeight / 2) + 1);
-                y = y - y % 5;
-                if (_.findIndex(this.fruits, {x: x, y: y}) == -1 && x >= 0 && y >= 0)
-                    this.fruits.push(new Point(x, y));
-                else
-                    i--;
-            }
-        };
-
-        this.genFruits();
-
-        this.triggerEvent = function (event, args) {
-            if ($comm.ws)
-                $comm.ws.send((this.opponent || $("#players").val()) + "|" + event + "," + JSON.stringify(args))
-        };
-
-        this.handleEvent = function (event, args) {
-            switch (event) {
-                case EVENTS.FRUIT_EATEN:
-                    var fruitInx = _.findIndex(this.fruits, {x: args.x, y: args.y});
-                    if (fruitInx != -1)this.fruits.splice(fruitInx, 1);
-                    break;
-                case EVENTS.OPPONENT_LOST:
-                    $canvas.fillStyle = "white";
-                    $canvas.font = "20px Arial, sans-serif";
-                    $canvas.textAlign = "center";
-                    $canvas.textBaseline = "middle";
-                    $canvas.fillText("You Won!", window.innerWidth / 2, window.innerHeight / 4 + 25);
-                    cancelRequestAnimFrame($game.init);
+            this.handleEvent = function (event, args) {
+                var that = this;
+                switch (event) {
+                    case EVENTS.FRUIT_EATEN:
+                        var fruit = args;
+                        var findex = _.findIndex(this.fruits, {x: fruit.x, y: fruit.y});
+                        this.fruits.splice(findex, 1);
+                        this.rsnake.dots.push(new Point(fruit.x, fruit.y));
+                        break;
+                    case EVENTS.OPPONENT_LOST:
+                    case EVENTS.OPPONENT_WON:
+                        $canvas.fillStyle = "white";
+                        $canvas.font = "20px Arial, sans-serif";
+                        $canvas.textAlign = "center";
+                        $canvas.textBaseline = "middle";
+                        $canvas.fillText("You " + (event === EVENTS.OPPONENT_LOST ? "Won" : "Lost"), W / 2, H / 2 + 25);
+                        cancelRequestAnimFrame(this.init);
+                        break;
+                    case EVENTS.GAME_INIT:
+                        this.fruits = [];
+                        var remoteGame = args
+                        _.each(remoteGame.fruits, function (value) {
+                            that.fruits.push(new Point(value.x, value.y));
+                        });
+                        this.rsnake.dots = [];
+                        _.each(remoteGame.snake.dots, function (value) {
+                            that.rsnake.dots.push(new Point(value.x, value.y));
+                        });
+                        this.rsnake.startedMoving = true;
+                        this.triggerEvent(EVENTS.GAME_INIT_REPLY, this);
+                        this.draw();
+                        break;
+                    case EVENTS.GAME_INIT_REPLY:
+                        this.rsnake.dots = [];
+                        var remoteGame = args;
+                        _.each(remoteGame.snake.dots, function (value) {
+                            that.rsnake.dots.push(new Point(value.x, value.y));
+                        });
+                        this.rsnake.startedMoving = true;
+                        break;
+                    case EVENTS.SNAKE_MOVED:
+                        var newpoint = args;
+                        this.rsnake.dots = this.rsnake.dots.slice(1);
+                        this.rsnake.dots.push(new Point(newpoint.x, newpoint.y));
+                        break;
+                }
             }
         }
-    }
 
-    $game.animLoop = function () {
-        $game.init = requestAnimFrame($game.animLoop);
-        if ($game.rsnake.dots.length > 0 && $game.rsnake.startedMoving == true)
-            $game.draw();
-    };
+        $game.animLoop = function () {
+            $game.init = requestAnimFrame($game.animLoop);
+            if ($game.rsnake.dots.length > 0 && $game.rsnake.startedMoving == true)
+                $game.draw();
+        };
 
-    $game.draw();
+        $game.draw();
 
-    document.addEventListener('keydown', function (event) {
-        var keymap = {'37': 'l', '38': 'u', '39': 'r', '40': 'd'};
-        $game.snake.turn(keymap[event.keyCode.toString()]);
-    }, false);
+        document.addEventListener('keydown', function (event) {
+            var keymap = {'37': 'l', '38': 'u', '39': 'r', '40': 'd'};
+            $game.snake.turn(keymap[event.keyCode.toString()]);
+        }, false);
 
-    $game.animLoop();
-
+        $game.animLoop();
+    })(window);
 </script>
 </html>

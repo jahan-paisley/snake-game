@@ -10,10 +10,10 @@ import javax.net.ssl.SSLEngine;
 /**
  * @author <a href="mailto:norman.maurer@googlemail.com">Norman Maurer</a>
  */
-public class SecureGameServerChannelIntializer extends GameServerChannelInitializer {
+public class SecureSnakeServerChannelIntializer extends SnakeServerChannelInitializer {
     private final SslContext context;
 
-    public SecureGameServerChannelIntializer(ChannelGroup group, SslContext context) {
+    public SecureSnakeServerChannelIntializer(ChannelGroup group, SslContext context) {
         super(group);
         this.context = context;
     }
