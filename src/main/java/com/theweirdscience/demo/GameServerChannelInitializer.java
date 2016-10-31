@@ -9,13 +9,10 @@ import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolHandler;
 import io.netty.handler.stream.ChunkedWriteHandler;
 
-/**
- * @author <a href="mailto:norman.maurer@googlemail.com">Norman Maurer</a>
- */
-public class GameServerInitializer extends ChannelInitializer<Channel> {
+public class GameServerChannelInitializer extends ChannelInitializer<Channel> {
     private final ChannelGroup group;
 
-    public GameServerInitializer(ChannelGroup group) {
+    public GameServerChannelInitializer(ChannelGroup group) {
         this.group = group;
     }
 

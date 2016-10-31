@@ -9,9 +9,6 @@ import io.netty.handler.ssl.util.SelfSignedCertificate;
 
 import java.net.InetSocketAddress;
 
-/**
- * @author <a href="mailto:norman.maurer@googlemail.com">Norman Maurer</a>
- */
 public class SecurePongServer extends PongServer {
 
     private final SslContext context;
@@ -22,7 +19,7 @@ public class SecurePongServer extends PongServer {
 
     @Override
     protected ChannelInitializer<Channel> createInitializer(ChannelGroup group) {
-        return new SecureGameServerIntializer(group, context);
+        return new SecureGameServerChannelIntializer(group, context);
     }
 
     public static void main(String[] args) throws Exception{

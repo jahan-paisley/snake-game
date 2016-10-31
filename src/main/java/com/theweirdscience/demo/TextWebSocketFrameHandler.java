@@ -1,6 +1,8 @@
 package com.theweirdscience.demo;
 
 import com.google.common.collect.Maps;
+import com.theweirdscience.demo.model.Game;
+import com.theweirdscience.demo.model.Player;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
@@ -15,7 +17,8 @@ import java.util.stream.Collectors;
 
 public class TextWebSocketFrameHandler extends SimpleChannelInboundHandler<TextWebSocketFrame> {
     private final ChannelGroup group;
-    private static final Map<User, Channel> users = Maps.newHashMap();
+    private static final Map<Player, Channel> users = Maps.newConcurrentMap();
+    private static final List<Game> Games = Collections.synchronizedList(new ArrayList<Game>());
     private static final RandomNameGenerator rnd = new RandomNameGenerator(0);
 
     public TextWebSocketFrameHandler(ChannelGroup group) {
@@ -24,11 +27,9 @@ public class TextWebSocketFrameHandler extends SimpleChannelInboundHandler<TextW
 
     @Override
     public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
-        ;
-
         if (evt == WebSocketServerProtocolHandler.ServerHandshakeStateEvent.HANDSHAKE_COMPLETE) {
             ctx.pipeline().remove(HttpRequestHandler.class);
-            users.put(new User(rnd.next(), ctx.channel().remoteAddress()), ctx.channel());
+            users.put(new Player(rnd.next(), ctx.channel().remoteAddress()), ctx.channel());
             group.writeAndFlush(new TextWebSocketFrame("Client " + ctx.channel().remoteAddress() + " joined"));
             group.add(ctx.channel());
             sendUsersToAll();
@@ -70,8 +71,8 @@ public class TextWebSocketFrameHandler extends SimpleChannelInboundHandler<TextW
                 .map(z -> z.getKey().name).findFirst().get();
     }
 
-    public User findUser(SocketAddress remoteAddress) {
-        Optional<User> first = users.entrySet()
+    public Player findUser(SocketAddress remoteAddress) {
+        Optional<Player> first = users.entrySet()
                 .stream()
                 .filter(x -> x.getKey().remoteAddress.equals(remoteAddress))
                 .map(z -> z.getKey())
@@ -93,6 +94,8 @@ public class TextWebSocketFrameHandler extends SimpleChannelInboundHandler<TextW
                 ctx.channel().writeAndFlush(new TextWebSocketFrame("probably client has been disconnected"));
         } catch (Exception e) {
             ctx.channel().writeAndFlush(new TextWebSocketFrame("exception happened:" + e.getMessage()));
+        } finally {
+            msg.release();
         }
     }
 }

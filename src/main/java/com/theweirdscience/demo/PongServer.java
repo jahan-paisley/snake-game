@@ -31,7 +31,7 @@ public class PongServer {
     }
 
     protected ChannelInitializer<Channel> createInitializer(ChannelGroup group) {
-       return new GameServerInitializer(group);
+       return new GameServerChannelInitializer(group);
     }
 
     public void destroy() {

@@ -1,12 +1,12 @@
-package com.theweirdscience.demo;
+package com.theweirdscience.demo.model;
 
 import java.net.SocketAddress;
 
-public class User {
+public class Player {
     public String name;
     public SocketAddress remoteAddress;
 
-    public User(String name, SocketAddress remoteAddress) {
+    public Player(String name, SocketAddress remoteAddress) {
         this.name = name;
         this.remoteAddress = remoteAddress;
     }
@@ -21,10 +21,10 @@ public class User {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
 
-        User user = (User) o;
+        Player player = (Player) o;
 
-        if (name != null ? !name.equals(user.name) : user.name != null) return false;
-        return remoteAddress != null ? remoteAddress.equals(user.remoteAddress) : user.remoteAddress == null;
+        if (name != null ? !name.equals(player.name) : player.name != null) return false;
+        return remoteAddress != null ? remoteAddress.equals(player.remoteAddress) : player.remoteAddress == null;
 
     }
 

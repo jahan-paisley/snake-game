@@ -43,7 +43,7 @@
         </td>
         <td>
             Users:
-            <select id="users" class="form-control">
+            <select id="players" class="form-control">
             </select>
             <input type="submit" class="btn" id="play" value="Play"/>
         </td>
@@ -74,87 +74,136 @@
 
     var ws = null;
 
-    $(function () {
-        var url = "ws://" + location.host + '/ws';
+    function Communication() {
+        this.ws = null;
 
-        if (!WebSocket) {
-            $('#not-supported').show();
-        } else {
-            $('#connect').click(function () {
-                if (ws == null || ws.readyState != 1) {
-                    ws = new WebSocket(url);
-                    ws.onerror = function (e) {
-                        log('Error : ' + e.message);
-                    }
-                    ws.onopen = function () {
-                        log('connected');
-                        $("#connect").prop('disabled', true)
-                    }
-                    ws.onclose = function () {
-                        log('disconnected');
-                    }
-                    ws.onmessage = function (d) {
-                        if (d.data.startsWith("users_updated,")) {
-                            var users = JSON.parse(d.data.split('users_updated,').slice(1));
-                            if (users.length > 0) {
-                                $('#users').find('option').remove();
-                                _.each(users, function (user) {
-                                    _.each(user, function (key, value) {
-                                        $('#users').append($('<option>',
-                                                {
-                                                    value: key,
-                                                    text: value
-                                                }))
-                                    });
-                                });
-                            }
-                        }
-                        else if (d.data.indexOf("game,") != -1) {
-                            var remoteGame = JSON.parse(d.data.split("game,")[1]);
-                            game.drawFromRemote(remoteGame);
-                        }
-                        if (d.data.startsWith("snake,")) {
+        this.setup = function () {
+            var url = "ws://" + location.host + '/ws';
 
-                        }
-                        else if (d.data.indexOf("fruit_removed,") != -1) {
-                            var fruit = d.data.split("fruit_removed,")[2];
-                            var findex = _.findIndex(game.fruits, {x: fruit.x, y: fruit.y});
-                            game.fruits.splice(findex, 1);
-                        }
-                        else
-                            log(d.data);
+            if (!WebSocket) {
+                $('#not-supported').show();
+            } else {
+                var that = this;
+                $('#connect').click(function () {
+                    if (that.ws == null || that.ws.readyState != 1) {
+                        that.ws = new WebSocket(url);
+                        that.bindCallbacks();
                     }
-                    $('#send').click(function () {
-                        var msg = $('#msg').val();
-                        $('#msg').val('');
-                        try {
-                            if ($('#users').val()) {
-                                ws.send($('#users').val() + "|" + msg);
-                                log('Message sent');
-                            }
-                            else {
-                                alert("please choose a recipient!");
-                            }
-                        }
-                        catch (ex) {
-                            log('Message not sent due to' + ex);
-                        }
-                    })
+                    else {
+                        log('closing connection');
+                        that.ws.close();
+                    }
+                });
+            }
+        };
+
+        this.bindCallbacks = function () {
+            this.ws.onerror = function (e) {
+                log('Error : ' + e.message);
+            }
+            this.ws.onopen = function () {
+                log('connected');
+                $("#connect").prop('disabled', true)
+            }
+            this.ws.onclose = function () {
+                log('disconnected');
+            }
+            this.ws.onmessage = function (d) {
+                if (d.data.startsWith("users_updated,")) {
+                    var players = JSON.parse(d.data.split('users_updated,').slice(1));
+                    if (players.length > 0) {
+                        $('#players').find('option').remove();
+                        _.each(players, function (player) {
+                            _.each(player, function (key, value) {
+                                $('#players').append($('<option>',
+                                        {
+                                            value: key,
+                                            text: value
+                                        }))
+                            });
+                        });
+                    }
                 }
-                else {
-                    log('closing connection');
-                    ws.close();
+                else if (d.data.indexOf(EVENTS.GAME_INIT + ",") != -1) {
+                    var remoteGame = JSON.parse(d.data.split(EVENTS.GAME_INIT + ",")[1]);
+                    var resp = prompt("Do you want to start a game?", "Yes");
+                    if (resp == "Yes") {
+                        $game.fruits = [];
+                        _.each(remoteGame.fruits, function (value) {
+                            $game.fruits.push(new Point(value.x, value.y));
+                        });
+                        $game.rsnake.dots = [];
+                        _.each(remoteGame.snake.dots, function (value) {
+                            $game.rsnake.dots.push(new Point(value.x, value.y));
+                        });
+                        $game.rsnake.startedMoving = true;
+                        $game.triggerEvent(EVENTS.GAME_INIT_REPLY, $game);
+                        $game.draw();
+                    }
                 }
-            });
-            $('#play').click(function () {
-                var opponent = $('#users').val();
-                if (opponent) {
-                    ws.send(opponent + "|" + "game," + JSON.stringify(game));
+                else if (d.data.indexOf(EVENTS.GAME_INIT_REPLY + ",") != -1) {
+                    var remoteGame = JSON.parse(d.data.split(EVENTS.GAME_INIT_REPLY + ",")[1]);
+                    $game.rsnake.dots = [];
+                    _.each(remoteGame.snake.dots, function (value) {
+                        $game.rsnake.dots.push(new Point(value.x, value.y));
+                    });
+                    $game.rsnake.startedMoving = true;
+                }
+                /*
+                 else if (d.data.indexOf(EVENTS.GAME_INIT_REPLY_ACK + ",") != -1) {
+                 var remoteGame = JSON.parse(d.data.split(EVENTS.GAME_INIT_REPLY_ACK + ",")[1]);
+                 $game.rsnake.startedMoving = true;
+                 }
+                 */
+
+                else if (d.data.indexOf(EVENTS.SNAKE_MOVED) != -1) {
+                    var newpoint = JSON.parse(d.data.split(EVENTS.SNAKE_MOVED + ",")[1]);
+                    $game.rsnake.dots = $game.rsnake.dots.slice(1);
+                    $game.rsnake.dots.push(new Point(newpoint.x, newpoint.y));
+                }
+                else if (d.data.indexOf(EVENTS.FRUIT_EATEN) != -1) {
+                    var fruit = JSON.parse(d.data.split(EVENTS.FRUIT_EATEN + ",")[1]);
+                    var findex = _.findIndex($game.fruits, {x: fruit.x, y: fruit.y});
+                    $game.fruits.splice(findex, 1);
+                    $game.rsnake.dots.push(new Point(fruit.x, fruit.y));
                 }
                 else
-                    alert("please choose opponent!");
-            });
+                    log(d.data);
+            }
         }
+        ;
+
+        this.setup();
+    }
+
+    var $comm = new Communication();
+
+    $('#send').click(function () {
+        var msg = $('#msg').val();
+        $('#msg').val('');
+        try {
+            if ($('#players').val()) {
+                $comm.ws.send($('#players').val() + "|" + msg);
+                log('Message sent');
+            }
+            else {
+                alert("please choose a recipient!");
+            }
+        }
+        catch (ex) {
+            log('Message not sent due to' + ex);
+        }
+
+    });
+
+    $('#play').click(function () {
+        var opponent = $('#players').val();
+        if (opponent) {
+            $game.opponent = $("#players").val();
+            $game.triggerEvent(EVENTS.GAME_INIT, $game)
+        }
+        else
+            alert("please choose opponent!");
     });
 
 
@@ -163,31 +212,41 @@
     /* ---------------------------------------------------------------------------- */
 
     // RequestAnimFrame: a browser API for getting smooth animations
-    window.requestAnimFrame = (function () {
-        return window.requestAnimationFrame ||
-                window.webkitRequestAnimationFrame ||
-                window.mozRequestAnimationFrame ||
-                window.oRequestAnimationFrame ||
-                window.msRequestAnimationFrame ||
-                function (callback) {
-                    return window.setTimeout(callback, 1000 / 60);
+    window.requestAnimFrame = window.requestAnimationFrame ||
+            window.webkitRequestAnimationFrame ||
+            window.mozRequestAnimationFrame ||
+            window.oRequestAnimationFrame ||
+            window.msRequestAnimationFrame || (function () {
+                return function (callback) {
+                    return window.setTimeout(callback, 1000 / 10);
                 };
-    })();
-    window.cancelRequestAnimFrame = (function () {
-        return window.cancelAnimationFrame ||
-                window.webkitCancelRequestAnimationFrame ||
-                window.mozCancelRequestAnimationFrame ||
-                window.oCancelRequestAnimationFrame ||
-                window.msCancelRequestAnimationFrame ||
-                clearTimeout
-    })();
+            })();
+    window.cancelRequestAnimFrame = window.cancelAnimationFrame ||
+            window.webkitCancelRequestAnimationFrame ||
+            window.mozCancelRequestAnimationFrame ||
+            window.oCancelRequestAnimationFrame ||
+            window.msCancelRequestAnimationFrame || (function () {
+                return clearTimeout;
+            })();
+
     // Initialize canvasElm and required variables
     var canvasElm = document.getElementById("canvas"),
-            canvas = canvasElm.getContext("2d");
+            $canvas = canvasElm.getContext("2d");
     canvasElm.width = window.innerWidth;
     canvasElm.height = window.innerHeight / 2;
 
-    var game = new Game(canvas);
+    var $game = new Game();
+
+    var EVENTS = Object.freeze({
+        FRUIT_EATEN: "FRUIT_EATEN",
+        SNAKE_MOVED: "SNAKE_MOVED",
+        OPPONENT_LOST: "OPPONENT_LOST",
+        GAME_INIT: "GAME_INIT",
+        GAME_INIT_REPLY: "GAME_INIT_REPLY",
+        GAME_INIT_REPLY_ACK: "GAME_INIT_REPLY_ACK"
+    });
+
+    var UNIT = 1;
 
     function Point(x, y) {
         this.x = x;
@@ -197,16 +256,16 @@
             var nextp = new Point(this.x, this.y);
             switch (direction) {
                 case 'r':
-                    nextp.x += 1;
+                    nextp.x += UNIT;
                     break;
                 case 'l':
-                    nextp.x -= 1;
+                    nextp.x -= UNIT;
                     break;
                 case 'u':
-                    nextp.y -= 1;
+                    nextp.y -= UNIT;
                     break;
                 case 'd':
-                    nextp.y += 1;
+                    nextp.y += UNIT;
                     break;
             }
             return nextp;
@@ -227,10 +286,13 @@
 
     function Snake() {
         this.dots = [];
-        var randStart = Math.floor((Math.random() * window.innerWidth) + 1);
-        for (var i = randStart; i < randStart + 50; i++) {
-            this.dots.push(new Point(0, i));
+        this.startedMoving = false;
+
+        var randStart = Math.floor((Math.random() * 100) + 1);
+        for (var i = randStart; i < randStart + 30; i++) {
+            this.dots.push(new Point(10, i));
         }
+
         this.direction = 'd';
 
         this.turn = function (dir) {
@@ -248,94 +310,109 @@
             return true;
         };
 
-        this.move = function (canvas) {
+        this.move = function (game1) {
             var lastp = this.dots[this.dots.length - 1];
             var nextp = lastp.next(this.direction);
-            var fruitInx = _.findIndex(game.fruits, {x: lastp.x, y: lastp.y});
+            var fruitInx = _.findIndex(game1.fruits, {x: lastp.x, y: lastp.y});
             this.dots.push(nextp);
             if (fruitInx != -1) {
-                game.fnotify(game.fruits[fruitInx]);
-                game.fruits.splice(fruitInx, 1);
+                game1.triggerEvent(EVENTS.FRUIT_EATEN, game1.fruits[fruitInx]);
+                game1.fruits.splice(fruitInx, 1);
             }
-            else
+            else {
                 this.dots = this.dots.slice(1);
+                game1.triggerEvent(EVENTS.SNAKE_MOVED, game1.snake.dots[game1.snake.dots.length - 1]);
+            }
         };
-
-        this.draw = function (canvas) {
-            canvas.lineWidth = 5;
-            canvas.strokeStyle = "red";
-            canvas.beginPath();
-            canvas.moveTo(this.dots[0].x, this.dots[0].y);
-            for (var i = 0; i < this.dots.length; ++i)
-                canvas.lineTo(this.dots[i].x, this.dots[i].y);
-            canvas.stroke();
-            if (ws) ws.send($("#users").val() + "|" + "snake," + JSON.stringify(this.snake));
-        }
-    }
-
-    function Game(canvas) {
-        this.snake = new Snake();
-        this.rsnake = new Snake();
-        this.canvas = canvas;
-        this.fruits = [];
 
         this.draw = function () {
-            this.canvas.fillRect(0, 0, window.innerWidth, window.innerHeight / 2);
-            this.snake.draw(this.canvas);
-            this.snake.move(this.canvas);
-            this.rsnake.draw(this.canvas);
-            this.fillFruits();
-        };
-
-        this.fillFruits = function () {
-            for (var i = 0; i < this.fruits.length; i++) {
-                this.canvas.beginPath();
-                this.canvas.fillStyle = "yellow";
-                this.canvas.fillRect(this.fruits[i].x, this.fruits[i].y, 5, 5);
-                this.canvas.fillStyle = "black";
-            }
-        }
-
-        this.drawFruits = function () {
-            for (var i = 0; i < 50; i++) {
-                var x = Math.floor((Math.random() * window.innerWidth) + 1);
-                var y = Math.floor((Math.random() * window.innerHeight / 2) + 1);
-                this.fruits.push(new Point(x, y));
-            }
-        };
-
-        this.drawFruits();
-
-        this.drawFromRemote = function (remoteGame) {
-
-            game.fruits = [];
-            _.each(remoteGame.fruits, function (value) {
-                game.fruits.push(new Point(value.x, value.y));
-            });
-
-            _.each(remoteGame.snake.dots, function (value) {
-                game.rsnake.dots = [];
-                game.rsnake.dots.push(new Point(value.x, value.y));
-            });
-            game.draw();
-        };
-
-        this.fnotify = function (fruit) {
-            ws.send($("#users").val() + "|" + "fruit_removed," + fruits)
+            $canvas.lineWidth = UNIT;
+            $canvas.strokeStyle = "red";
+            $canvas.beginPath();
+            $canvas.moveTo(this.dots[0].x, this.dots[0].y);
+            for (var i = 0; i < this.dots.length; ++i)
+                $canvas.lineTo(this.dots[i].x, this.dots[i].y);
+            $canvas.stroke();
         }
     }
-    game.animLoop = function () {
-        requestAnimFrame(game.animLoop);
-        game.draw();
+
+    function Game() {
+        this.snake = new Snake();
+        this.rsnake = new Snake();
+        this.rsnake.dots = [];
+
+        this.fruits = [];
+        this.opponent = null;
+        this.init = null;
+
+        this.draw = function () {
+            $canvas.fillRect(0, 0, window.innerWidth, window.innerHeight / 2);
+            this.snake.draw();
+            if (this.rsnake.dots.length > 0)this.rsnake.draw();
+            this.snake.move(this);
+            this.drawFruits();
+        };
+
+        this.drawFruits = function () {
+            for (var i = 0; i < this.fruits.length; i++) {
+                $canvas.beginPath();
+                $canvas.fillStyle = "yellow";
+                $canvas.fillRect(this.fruits[i].x, this.fruits[i].y, UNIT, UNIT);
+                $canvas.fillStyle = "black";
+            }
+        };
+
+        this.genFruits = function () {
+            for (var i = 0; i < 50; i++) {
+                var x = Math.floor((Math.random() * window.innerWidth) + 1);
+                x = x - x % 5;
+                var y = Math.floor((Math.random() * window.innerHeight / 2) + 1);
+                y = y - y % 5;
+                if (_.findIndex(this.fruits, {x: x, y: y}) == -1 && x >= 0 && y >= 0)
+                    this.fruits.push(new Point(x, y));
+                else
+                    i--;
+            }
+        };
+
+        this.genFruits();
+
+        this.triggerEvent = function (event, args) {
+            if ($comm.ws)
+                $comm.ws.send((this.opponent || $("#players").val()) + "|" + event + "," + JSON.stringify(args))
+        };
+
+        this.handleEvent = function (event, args) {
+            switch (event) {
+                case EVENTS.FRUIT_EATEN:
+                    var fruitInx = _.findIndex(this.fruits, {x: args.x, y: args.y});
+                    if (fruitInx != -1)this.fruits.splice(fruitInx, 1);
+                    break;
+                case EVENTS.OPPONENT_LOST:
+                    $canvas.fillStyle = "white";
+                    $canvas.font = "20px Arial, sans-serif";
+                    $canvas.textAlign = "center";
+                    $canvas.textBaseline = "middle";
+                    $canvas.fillText("You Won!", window.innerWidth / 2, window.innerHeight / 4 + 25);
+                    cancelRequestAnimFrame($game.init);
+            }
+        }
+    }
+
+    $game.animLoop = function () {
+        $game.init = requestAnimFrame($game.animLoop);
+        if ($game.rsnake.dots.length > 0 && $game.rsnake.startedMoving == true)
+            $game.draw();
     };
 
-    game.draw();
+    $game.draw();
 
     document.addEventListener('keydown', function (event) {
         var keymap = {'37': 'l', '38': 'u', '39': 'r', '40': 'd'};
-        game.snake.turn(keymap[event.keyCode.toString()]);
+        $game.snake.turn(keymap[event.keyCode.toString()]);
     }, false);
-    canvasElm.addEventListener("mousedown", game.animLoop, true);
+
+    $game.animLoop();
 
 </script>
 </html>
